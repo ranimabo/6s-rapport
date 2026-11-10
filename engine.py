@@ -26,6 +26,13 @@ def generate_report(PPTX_FILE, JSON_FILE, REPORT_MONTH, PHOTO_ZIP=None, SAFETY_Z
         s=unicodedata.normalize('NFKD',str(s)).encode('ascii','ignore').decode('ascii').lower()
         return re.sub(r'[^a-z0-9]','',s)
 
+    def apply_score_color(shape, value):
+        """Color results red below 80%, green at/above 80%; gray for N/A."""
+        color=(255,100,110) if value is not None and float(value)<0.8 else (113,232,165) if value is not None else (180,195,211)
+        for para in shape.text_frame.paragraphs:
+            for run in para.runs:
+                run.font.color.rgb=RGBColor(*color)
+
     def pct(v):
         return 'N/A' if v is None else f'{float(v)*100:.2f} %'
 
@@ -123,7 +130,9 @@ def generate_report(PPTX_FILE, JSON_FILE, REPORT_MONTH, PHOTO_ZIP=None, SAFETY_Z
     if len(shapes)!=7:raise ValueError(f'Expected seven score boxes on slide 2, found {len(shapes)}')
     values=[avg([d[SKEYS[k]] for d in month_rows]) for k in range(5)]
     s6=avg([safety_value(d) for d in month_rows])
-    for sh,val in zip(shapes,[values[0],values[1],values[2],values[3],s6,avg([overall(d) for d in month_rows]),values[4]]):set_text(sh,pct(val))
+    for sh,val in zip(shapes,[values[0],values[1],values[2],values[3],s6,avg([overall(d) for d in month_rows]),values[4]]):
+        set_text(sh,pct(val))
+        apply_score_color(sh,val)
 
     # Ranking slide: native editable table instead of placeholder.
     set_month(ranking)
@@ -148,6 +157,8 @@ def generate_report(PPTX_FILE, JSON_FILE, REPORT_MONTH, PHOTO_ZIP=None, SAFETY_Z
                 p.alignment=PP_ALIGN.CENTER if col in (0,2) else PP_ALIGN.LEFT
                 for r in p.runs:
                     r.font.size=Pt(14 if nrows<11 else 12);r.font.bold=(i==0);r.font.color.rgb=RGBColor(255,255,255)
+                    if i>0 and col==2:
+                        r.font.color.rgb=RGBColor(*((255,100,110) if overall(ordered[i-1])<0.8 else (113,232,165)))
 
     # Populate detail template for the first segment, clone it for further segments.
     def fill_detail(slide,d,photos,offset=0):
@@ -156,7 +167,9 @@ def generate_report(PPTX_FILE, JSON_FILE, REPORT_MONTH, PHOTO_ZIP=None, SAFETY_Z
         if title:set_text(title,f'{d[SEGMENT]} — RESULTS'+(f' (PHOTOS {offset+1}–{min(offset+6,len(photos))})' if offset else ''))
         scoreboxes=[sh for sh in slide.shapes if sh.has_text_frame and sh.text.strip()=='[XX.XX %]']
         if len(scoreboxes)!=7:raise ValueError(f'Expected 7 segment score boxes, found {len(scoreboxes)}')
-        for sh,val in zip(scoreboxes,[overall(d)]+[d[k] for k in SKEYS[:5]]+[safety_value(d)]):set_text(sh,pct(val))
+        for sh,val in zip(scoreboxes,[overall(d)]+[d[k] for k in SKEYS[:5]]+[safety_value(d)]):
+            set_text(sh,pct(val))
+            apply_score_color(sh,val)
         slots=[sh for sh in slide.shapes if sh.has_text_frame and sh.text.startswith('PHOTO ')]
         for pos,slot in enumerate(slots):
             x,y,w,h=slot.left,slot.top,slot.width,slot.height

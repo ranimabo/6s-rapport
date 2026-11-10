@@ -2,6 +2,7 @@ import calendar
 import json
 import os
 import tempfile
+import zipfile
 from pathlib import Path
 
 import streamlit as st
@@ -43,7 +44,11 @@ if not months:
 month=st.selectbox('Choisir le mois du rapport', months, format_func=lambda x: f'{calendar.month_name[int(x[5:7])]} {x[:4]}')
 segments={str(row.get('MH_BI[Segment ]','')).strip() for row in rows if str(row.get('MH_BI[Month]','')).startswith(month)}
 st.caption(f'{len(segments)} segments trouvés pour ce mois. Le rapport comprend les résultats de tous les segments.')
-photo_zip=st.file_uploader('Photos par segment — ZIP (facultatif)',type=['zip'],help='Structure : 2026-06/Doors/photo1.jpg, 2026-06/FORD/photo2.jpg. Jusqu’à 6 photos par diapositive.')
+# Optional fallback only. For truly automatic work OneDrive access, Microsoft sign-in/
+# Graph authorization is required and must be configured separately.
+with st.expander('Photos — configuration temporaire (facultatif)'):
+    photo_zip=st.file_uploader('Importer des photos ZIP (mode provisoire)',type=['zip'],help='Structure : 2026-06/Doors/photo1.jpg. Cette étape sera retirée lorsque OneDrive sera connecté.')
+    st.caption('La connexion automatique aux dossiers OneDrive professionnels nécessite une authentification Microsoft autorisée.')
 with st.expander('Options de calcul'):
     missing_safety=st.checkbox('Afficher Sécurité à N/A lorsque sa valeur est 0',value=True,help='Les champs S6 du JSON fourni sont tous à zéro. Cette option évite de les interpréter comme des audits échoués sans confirmation.')
     st.caption('Le score global reprend le champ Power BI C_V 2 (moyenne des critères S1 à S5 dans le fichier fourni).')
